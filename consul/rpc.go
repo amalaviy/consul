@@ -11,6 +11,8 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -204,15 +206,40 @@ func (s *Server) forwardLeader(method string, args interface{}, reply interface{
 
 // forwardDC is used to forward an RPC call to a remote DC, or fail if no servers
 func (s *Server) forwardDC(method, dc string, args interface{}, reply interface{}) error {
-	// Bail if we can't find any servers
+
 	s.remoteLock.RLock()
+	// query RPCServerMapper for the remote server IP to target in case we have it set and
+	// in case of failure anywhere below, we'll try a random server in the remote datacenter
+	if s.config.RPCServerMapper != "" {
+		cmd := exec.Command(s.config.RPCServerMapper, dc)
+		if cmd != nil {
+			out, err := cmd.Output()
+			if err == nil {
+				serverIp := strings.TrimSpace(string(out[:]))
+				server := s.remoteConsulsByIp[net.JoinHostPort(serverIp, strconv.Itoa(s.config.RPCAddr.Port))]
+				if server != nil {
+					s.remoteLock.RUnlock()
+					// Forward to remote Consul
+					s.logger.Printf("[DEBUG] consul.rpc: RPC request for DC '%s', using '%s'", dc, serverIp)
+					metrics.IncrCounter([]string{"consul", "rpc", "cross-dc", dc}, 1)
+					return s.connPool.RPC(server.Addr, server.Version, method, args, reply)
+				}
+			} else {
+				s.logger.Printf("[ERROR] consul.rpc: rpc_server_mapper cmd '%s' failed, using random server in DC '%s'", s.config.RPCServerMapper, dc)
+			}
+		} else {
+			s.logger.Printf("[ERROR] consul.rpc: rpc_server_mapper cmd '%s' failed to create, using random server in DC '%s'", s.config.RPCServerMapper, dc)
+		}
+	}
+
+	// pick a random server in the remote datacenter
 	servers := s.remoteConsuls[dc]
+	// Bail if we can't find any servers
 	if len(servers) == 0 {
 		s.remoteLock.RUnlock()
 		s.logger.Printf("[WARN] consul.rpc: RPC request for DC '%s', no path found", dc)
 		return structs.ErrNoDCPath
 	}
-
 	// Select a random addr
 	offset := rand.Int31() % int32(len(servers))
 	server := servers[offset]

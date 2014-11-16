@@ -510,6 +510,26 @@ func TestDecodeConfig(t *testing.T) {
 		t.Fatalf("bad: %#v", config)
 	}
 
+	// RPCServerMapper
+	input = `{"rpc_server_mapper": "rpc-server-mapper.sh"}`
+	config, err = DecodeConfig(bytes.NewReader([]byte(input)))
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+	if config.RPCServerMapper != "rpc-server-mapper.h" {
+		t.Fatalf("bad: %#v", config)
+	}
+
+	// RPCServerMapper
+	input = `{"rpc_server_mapper": "rpc-server-mapper.sh"}`
+	config, err = DecodeConfig(bytes.NewReader([]byte(input)))
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+	if config.RPCServerMapper != "rpc-server-mapper.sh" {
+		t.Fatalf("bad: %#v", config)
+	}
+
 	// Disable updates
 	input = `{"disable_update_check": true, "disable_anonymous_signature": true}`
 	config, err = DecodeConfig(bytes.NewReader([]byte(input)))
@@ -848,6 +868,7 @@ func TestMergeConfig(t *testing.T) {
 			HTTP: "127.0.0.2",
 			RPC:  "127.0.0.3",
 		},
+		RPCServerMapper:        "/bin/rpc-server-mapper.sh",
 		Server:                 true,
 		LeaveOnTerm:            true,
 		SkipLeaveOnInt:         true,

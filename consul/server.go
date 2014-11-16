@@ -110,8 +110,9 @@ type Server struct {
 
 	// remoteConsuls is used to track the known consuls in
 	// remote data centers. Used to do DC forwarding.
-	remoteConsuls map[string][]*serverParts
-	remoteLock    sync.RWMutex
+	remoteConsuls     map[string][]*serverParts
+	remoteConsulsByIp map[string]*serverParts
+	remoteLock        sync.RWMutex
 
 	// rpcListener is used to listen for incoming connections
 	rpcListener net.Listener
@@ -184,17 +185,18 @@ func NewServer(config *Config) (*Server, error) {
 
 	// Create server
 	s := &Server{
-		config:        config,
-		connPool:      NewPool(config.LogOutput, serverRPCCache, serverMaxStreams, tlsConfig),
-		eventChLAN:    make(chan serf.Event, 256),
-		eventChWAN:    make(chan serf.Event, 256),
-		localConsuls:  make(map[string]*serverParts),
-		logger:        logger,
-		reconcileCh:   make(chan serf.Member, 32),
-		remoteConsuls: make(map[string][]*serverParts),
-		rpcServer:     rpc.NewServer(),
-		rpcTLS:        incomingTLS,
-		shutdownCh:    make(chan struct{}),
+		config:            config,
+		connPool:          NewPool(config.LogOutput, serverRPCCache, serverMaxStreams, tlsConfig),
+		eventChLAN:        make(chan serf.Event, 256),
+		eventChWAN:        make(chan serf.Event, 256),
+		localConsuls:      make(map[string]*serverParts),
+		logger:            logger,
+		reconcileCh:       make(chan serf.Member, 32),
+		remoteConsuls:     make(map[string][]*serverParts),
+		remoteConsulsByIp: make(map[string]*serverParts),
+		rpcServer:         rpc.NewServer(),
+		rpcTLS:            incomingTLS,
+		shutdownCh:        make(chan struct{}),
 	}
 
 	// Initialize the authoritative ACL cache

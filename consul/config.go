@@ -71,6 +71,11 @@ type Config struct {
 	// reachable
 	RPCAdvertise *net.TCPAddr
 
+	// RPCServerMapper, call the external mapper function specified and
+	// use the result string as the IP to choose for remote server to target. If empty,
+	// pick a random server in remote Datacenter specified.
+	RPCServerMapper string
+
 	// SerfLANConfig is the configuration for the intra-dc serf
 	SerfLANConfig *serf.Config
 

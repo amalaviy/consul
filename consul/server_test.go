@@ -213,6 +213,16 @@ func TestServer_JoinWAN(t *testing.T) {
 	}, func(err error) {
 		t.Fatalf("remote consul missing")
 	})
+	// Check the remoteConsulsByIp has both
+	if len(s1.remoteConsulsByIp) != 2 {
+		t.Fatalf("remote consul missing")
+	}
+
+	testutil.WaitForResult(func() (bool, error) {
+		return len(s2.remoteConsulsByIp) == 2, nil
+	}, func(err error) {
+		t.Fatalf("remote consul missing")
+	})
 }
 
 func TestServer_Leave(t *testing.T) {

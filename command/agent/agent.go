@@ -241,6 +241,7 @@ func (a *Agent) consulConfig() *consul.Config {
 	base.CertFile = a.config.CertFile
 	base.KeyFile = a.config.KeyFile
 	base.ServerName = a.config.ServerName
+	base.RPCServerMapper = a.config.RPCServerMapper
 
 	// Setup the ServerUp callback
 	base.ServerUp = a.state.ConsulServerUp

@@ -141,6 +141,11 @@ type Config struct {
 	// Address configurations
 	Addresses AddressConfig
 
+	// Remote Datacenter RPC Server mapper, call the external mapper function specified and
+	// use the result string as the IP to choose for remote server to target. If empty,
+	// pick a random server in remote Datacenter specified.
+	RPCServerMapper string `mapstructure:"rpc_server_mapper"`
+
 	// LeaveOnTerm controls if Serf does a graceful leave when receiving
 	// the TERM signal. Defaults false. This can be changed on reload.
 	LeaveOnTerm bool `mapstructure:"leave_on_terminate"`
@@ -731,6 +736,9 @@ func MergeConfig(a, b *Config) *Config {
 	}
 	if b.Addresses.RPC != "" {
 		result.Addresses.RPC = b.Addresses.RPC
+	}
+	if b.RPCServerMapper != "" {
+		result.RPCServerMapper = b.RPCServerMapper
 	}
 	if b.UiDir != "" {
 		result.UiDir = b.UiDir

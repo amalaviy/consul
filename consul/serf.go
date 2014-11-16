@@ -168,6 +168,7 @@ func (s *Server) nodeJoin(me serf.MemberEvent, wan bool) {
 		// Add ot the list if not known
 		if !found {
 			s.remoteConsuls[parts.Datacenter] = append(existing, parts)
+			s.remoteConsulsByIp[parts.Addr.String()] = parts
 		}
 		s.remoteLock.Unlock()
 
@@ -266,6 +267,7 @@ func (s *Server) nodeFailed(me serf.MemberEvent, wan bool) {
 		} else {
 			s.remoteConsuls[parts.Datacenter] = existing
 		}
+		delete(s.remoteConsulsByIp, parts.Addr.String())
 		s.remoteLock.Unlock()
 
 		// Remove from the local list as well
