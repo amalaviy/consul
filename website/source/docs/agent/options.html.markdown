@@ -158,6 +158,11 @@ The options below are all specified on the command-line.
 * `-syslog` - This flag enables logging to syslog. This is only supported on Linux
   and OSX. It will result in an error if provided on Windows.
 
+* `-log-file` - This flag provides the file path for the log file. The logging will be
+  done to the specified log file suffixed with ".current". When the agent receives a
+  SIGHUP signal, it will copy the suffixed log to the log-file specified, and truncate
+  the suffixed file.
+
 * `-ui-dir` - This flag provides a the directory containing the Web UI resources
   for Consul. This must be provided to enable the Web UI. Directory must be readable.
 
@@ -330,6 +335,11 @@ definitions support being updated during a reload.
 * `leave_on_terminate` - If enabled, when the agent receives a TERM signal,
   it will send a Leave message to the rest of the cluster and gracefully
   leave. Defaults to false.
+
+* `log_file` - The path to the log file to log into. The actual file
+  it logs to is log_file with a ".current" suffix. If set, when the
+  agent receives a SIGHUP signal, it will copy the suffixed log file to
+  the specified log_file and truncate the suffixed log file.
 
 * `log_level` - Equivalent to the `-log-level` command-line flag.
 

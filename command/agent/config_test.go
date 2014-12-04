@@ -415,6 +415,17 @@ func TestDecodeConfig(t *testing.T) {
 		t.Fatalf("bad: %#v", config)
 	}
 
+	// Log File
+	input = `{"log_file": "/tmp/consul/logfile.log"}`
+	config, err = DecodeConfig(bytes.NewReader([]byte(input)))
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	if config.LogFile != "/tmp/consul/logfile.log" {
+		t.Fatalf("bad: %#v", config)
+	}
+
 	// Rejoin
 	input = `{"rejoin_after_leave": true}`
 	config, err = DecodeConfig(bytes.NewReader([]byte(input)))

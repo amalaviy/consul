@@ -244,6 +244,9 @@ type Config struct {
 	// By default, goes to LOCAL0
 	SyslogFacility string `mapstructure:"syslog_facility"`
 
+	// The LogFile path to put logs into instead of syslog, or stdout
+	LogFile string `mapstructure:"log_file"`
+
 	// RejoinAfterLeave controls our interaction with the cluster after leave.
 	// When set to false (default), a leave causes Consul to not rejoin
 	// the cluster until an explicit join is received. If this is set to
@@ -782,6 +785,9 @@ func MergeConfig(a, b *Config) *Config {
 	}
 	if b.EnableSyslog {
 		result.EnableSyslog = true
+	}
+	if b.LogFile != "" {
+		result.LogFile = b.LogFile
 	}
 	if b.RejoinAfterLeave {
 		result.RejoinAfterLeave = true

@@ -47,6 +47,10 @@ type Command struct {
 	dnsServer         *DNSServer
 }
 
+const (
+	LogFileCurrentExt = ".current"
+)
+
 // readConfig is responsible for setup of our configuration using
 // the command line and any file configs
 func (c *Command) readConfig() *Config {
@@ -80,6 +84,7 @@ func (c *Command) readConfig() *Config {
 
 	cmdFlags.BoolVar(&cmdConfig.EnableSyslog, "syslog", false,
 		"enable logging to syslog facility")
+	cmdFlags.StringVar(&cmdConfig.LogFile, "log-file", "", "path to the file to log into")
 	cmdFlags.BoolVar(&cmdConfig.RejoinAfterLeave, "rejoin", false,
 		"enable re-joining after a previous leave")
 	cmdFlags.Var((*AppendSliceValue)(&cmdConfig.StartJoin), "join",
@@ -257,6 +262,7 @@ func (c *Command) setupLoggers(config *Config) (*GatedWriter, *logWriter, io.Wri
 
 	// Check if syslog is enabled
 	var syslog io.Writer
+	var logFile *os.File
 	if config.EnableSyslog {
 		l, err := gsyslog.NewLogger(gsyslog.LOG_NOTICE, config.SyslogFacility, "consul")
 		if err != nil {
@@ -265,13 +271,26 @@ func (c *Command) setupLoggers(config *Config) (*GatedWriter, *logWriter, io.Wri
 		}
 		syslog = &SyslogWrapper{l, c.logFilter}
 	}
+	if config.LogFile != "" {
+		var err error
+		logFile, err = os.OpenFile(config.LogFile+LogFileCurrentExt, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660)
+		if err != nil {
+			c.Ui.Error(fmt.Sprintf("Log file setup failed for '%s': %v", config.LogFile, err))
+			return nil, nil, nil
+		}
+	}
 
 	// Create a log writer, and wrap a logOutput around it
 	logWriter := NewLogWriter(512)
 	var logOutput io.Writer
-	if syslog != nil {
+	switch {
+	case syslog != nil && logFile != nil:
+		logOutput = io.MultiWriter(c.logFilter, logWriter, syslog, logFile)
+	case syslog != nil:
 		logOutput = io.MultiWriter(c.logFilter, logWriter, syslog)
-	} else {
+	case logFile != nil:
+		logOutput = io.MultiWriter(c.logFilter, logWriter, logFile)
+	default:
 		logOutput = io.MultiWriter(c.logFilter, logWriter)
 	}
 	c.logOutput = logOutput
@@ -696,6 +715,38 @@ WAIT:
 	}
 }
 
+// handleLogRotate is invoked on SIGHUP
+func (c *Command) handleLogRotate(config *Config) error {
+	if config.LogFile != "" {
+		// always truncate the current file on HUP if log file is enabled
+		defer os.Truncate(config.LogFile+LogFileCurrentExt, 0)
+
+		c.Ui.Output(fmt.Sprintf("Rotating log '%s' to '%s'", config.LogFile+LogFileCurrentExt, config.LogFile))
+
+		// copy the LogFile+LogFileCurrentExt to LogFile and truncate the LogFileCurrentExt file
+		in, err := os.Open(config.LogFile + LogFileCurrentExt)
+		if err != nil {
+			c.Ui.Error(fmt.Sprintf("Cannot open file '%s': %v", config.LogFile, err))
+			return err
+		} else {
+			defer in.Close()
+			out, err := os.Create(config.LogFile)
+			if err != nil {
+				c.Ui.Error(fmt.Sprintf("Cannot create file '%s': %v", config.LogFile, err))
+				return err
+			} else {
+				defer out.Close()
+				_, err := io.Copy(out, in)
+				if err != nil {
+					c.Ui.Error(fmt.Sprintf("Cannot copy file '%s' to '%s': %v", config.LogFile+LogFileCurrentExt, config.LogFile, err))
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // handleReload is invoked when we should reload our configs, e.g. SIGHUP
 func (c *Command) handleReload(config *Config) *Config {
 	c.Ui.Output("Reloading configuration...")
@@ -721,6 +772,17 @@ func (c *Command) handleReload(config *Config) *Config {
 	// Bulk update the services and checks
 	c.agent.PauseSync()
 	defer c.agent.ResumeSync()
+
+	// rotate the logs if enabled
+	if newConf.LogFile != config.LogFile {
+		c.Ui.Error("Cannot change the log file path dynamically via HUP")
+		return config
+	} else if newConf.LogFile != "" {
+		err := c.handleLogRotate(newConf)
+		if err != nil {
+			c.Ui.Error("Could not rotate the log file via HUP, truncated only")
+		}
+	}
 
 	// Reload services and check definitions
 	if err := c.agent.reloadServices(newConf); err != nil {
@@ -799,6 +861,7 @@ Options:
   -retry-interval-wan=30s  Time to wait between join -wan attempts.
   -retry-max-wan=0         Maximum number of join -wan attempts. Defaults to 0, which
                            will retry indefinitely.
+  -log-file=foo            The path to the log file to log into.
   -log-level=info          Log level of the agent.
   -node=hostname           Name of this node. Must be unique in the cluster
   -protocol=N              Sets the protocol version. Defaults to latest.
